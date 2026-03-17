@@ -4,26 +4,42 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 
 const questions = [
-    { id: 'environment', title: 'What environment do you prefer?', options: ['City', 'Mountain', 'Beach', 'Tropical'] },
-    { id: 'activity', title: 'What is your primary activity?', options: ['Relaxation', 'Adventure', 'Culture', 'Nature'] },
-    { id: 'climate', title: 'What is your ideal climate?', options: ['Warm', 'Cold'] },
-    { id: 'vibe', title: 'What vibe are you looking for?', options: ['Modern', 'History', 'Nightlife', 'Quiet', 'Nature'] },
-    { id: 'food', title: 'Is culinary experience a priority?', options: ['Important', 'Standard'] }
+    { id: 'Adventure', title: 'How much do you value Adventure on a trip?', options: ['Not at all', 'A Little', 'Moderate', 'Very Much', 'Mandalorian'] },
+    { id: 'Relaxation', title: 'How important is Pure Relaxation?', options: ['Not at all', 'A Little', 'Moderate', 'Very Much', 'Mandalorian'] },
+    { id: 'Culture', title: 'Do you seek Cultural and Historical depth?', options: ['Not at all', 'A Little', 'Moderate', 'Very Much', 'Mandalorian'] },
+    { id: 'Nature', title: 'How drawn are you to Nature and Wildlife?', options: ['Not at all', 'A Little', 'Moderate', 'Very Much', 'Mandalorian'] },
+    { id: 'Social', title: 'Do you prioritize Socializing and Nightlife?', options: ['Not at all', 'A Little', 'Moderate', 'Very Much', 'Mandalorian'] }
 ];
+
+const optionToScore = {
+    'Not at all': 0.0,
+    'A Little': 0.25,
+    'Moderate': 0.5,
+    'Very Much': 0.75,
+    'Mandalorian': 1.0
+};
 
 export default function Questionnaire() {
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState({});
     const navigate = useNavigate();
 
-    const handleSelect = (option) => {
-        const newAnswers = { ...answers, [questions[currentStep].id]: option };
+    const handleSelect = (optLabel) => {
+        const score = optionToScore[optLabel];
+        const newAnswers = { ...answers, [questions[currentStep].id]: score };
         setAnswers(newAnswers);
 
         if (currentStep < questions.length - 1) {
             setTimeout(() => setCurrentStep(prev => prev + 1), 300);
         } else {
-            setTimeout(() => navigate('/results', { state: { answers: newAnswers } }), 300);
+            // Convert to array of floats exactly in order: ['Adventure', 'Relaxation', 'Culture', 'Nature', 'Social']
+            const finalSurveyArray = questions.map(q => newAnswers[q.id] || 0.0);
+            
+            // Minimal history mock format as fallback if no real BE endpoint supplies it yet
+            // user past experience history can be grabbed dynamically later
+            const history = []; 
+
+            setTimeout(() => navigate('/results', { state: { survey: finalSurveyArray, history: history } }), 300);
         }
     };
 
@@ -31,7 +47,7 @@ export default function Questionnaire() {
 
     return (
         <div className="min-h-screen bg-background pt-24 pb-24 px-6 flex flex-col items-center">
-            <div className="max-w-3xl w-full">
+            <div className="max-w-4xl w-full">
                 {/* Progress Bar */}
                 <div className="mb-16 flex space-x-3 justify-center">
                     {questions.map((q, idx) => (
@@ -52,26 +68,29 @@ export default function Questionnaire() {
                             transition={{ type: 'spring', damping: 20, stiffness: 100 }}
                             className="absolute inset-0 flex flex-col items-center"
                         >
-                            <span className="text-secondary font-bold uppercase tracking-widest text-sm mb-4">Question {currentStep + 1} of {questions.length}</span>
+                            <span className="text-secondary font-bold uppercase tracking-widest text-sm mb-4">ML Assessment {currentStep + 1} of {questions.length}</span>
                             <h2 className="text-4xl md:text-5xl font-black text-primary mb-12 text-center leading-tight">{currentQ.title}</h2>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
-                                {currentQ.options.map((opt) => (
-                                    <motion.button
-                                        key={opt}
-                                        whileHover={{ scale: 1.02, y: -2 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleSelect(opt)}
-                                        className={`py-6 px-8 rounded-2xl text-xl font-bold border-2 transition-all flex justify-between items-center ${
-                                            answers[currentQ.id] === opt
-                                                ? 'border-accent bg-accent text-white shadow-xl shadow-accent/20'
-                                                : 'border-gray-100 text-primary bg-white hover:border-secondary hover:shadow-lg'
-                                        }`}
-                                    >
-                                        {opt}
-                                        <ChevronRight size={24} className={answers[currentQ.id] === opt ? 'opacity-100' : 'opacity-0'} />
-                                    </motion.button>
-                                ))}
+                            <div className="flex flex-col gap-4 w-full px-8">
+                                {currentQ.options.map((opt) => {
+                                    const scoreMatch = answers[currentQ.id] === optionToScore[opt];
+                                    return (
+                                        <motion.button
+                                            key={opt}
+                                            whileHover={{ scale: 1.02, x: 5 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => handleSelect(opt)}
+                                            className={`py-5 px-8 rounded-2xl text-xl font-bold border-2 transition-all flex justify-between items-center ${
+                                                scoreMatch
+                                                    ? 'border-accent bg-accent text-white shadow-xl shadow-accent/20'
+                                                    : 'border-gray-100 text-primary bg-white hover:border-secondary hover:shadow-lg'
+                                            }`}
+                                        >
+                                            {opt}
+                                            <ChevronRight size={24} className={scoreMatch ? 'opacity-100' : 'opacity-0'} />
+                                        </motion.button>
+                                    );
+                                })}
                             </div>
 
                             {currentStep > 0 && (

@@ -4,11 +4,16 @@ from geopy.distance import geodesic
 geolocator = Nominatim(user_agent="smart_travel_cost_estimator")
 
 def calculate_costs(hotels, duration, travelers, travel_style, origin, destination, scraped_data=None):
-    style_mult_map = {"Budget Friendly": 0.6, "Adventure": 1.2, "Relax": 1.5, "Cultural": 1.0, "Nature": 0.8, "Luxury": 2.5}
+    style_mult_map = {"Budget Friendly": 0.45, "Adventure": 1.1, "Relax": 1.5, "Cultural": 1.0, "Nature": 0.8, "Luxury": 2.5}
     style_mult = style_mult_map.get(travel_style, 1.0)
     
-    avg_hotel_price = sum(h["price"] for h in hotels) / len(hotels) if hotels else 8000
-    capacity_map = {"Budget Friendly": 5, "Luxury": 2, "Relax": 2}
+    avg_hotel_price = sum(h["price"] for h in hotels) / len(hotels) if hotels else 2500
+    
+    # If budget, clamp the hotel estimate so it stays extremely affordable
+    if travel_style == "Budget Friendly":
+        avg_hotel_price = min(avg_hotel_price, 1200)
+        
+    capacity_map = {"Budget Friendly": 4, "Luxury": 2, "Relax": 2}
     room_capacity = capacity_map.get(travel_style, 3)
     rooms_needed = max(1, (travelers + room_capacity - 1) // room_capacity)
     
@@ -16,53 +21,65 @@ def calculate_costs(hotels, duration, travelers, travel_style, origin, destinati
     
     # Core transport selection logic
     transport_mode = "Flights & Travel"
+    flight_tickets_total = 0
+    from scraper import scrape_skyscanner_flights
     
-    if travel_style == "Budget Friendly":
-        # SCRAPE live data from websites to compare budget travel
+    dist_miles = 0
+    is_international = False
+    try:
+        origin_loc = geolocator.geocode(origin, timeout=5)
+        dest_loc = geolocator.geocode(destination, timeout=5)
+        if origin_loc and dest_loc:
+            dist_miles = geodesic((origin_loc.latitude, origin_loc.longitude), (dest_loc.latitude, dest_loc.longitude)).miles
+            # Simple international heuristic
+            o_addr = origin_loc.address.lower()
+            d_addr = dest_loc.address.lower()
+            if ("india" in o_addr and "india" not in d_addr) or ("india" not in o_addr and "india" in d_addr):
+                is_international = True
+    except Exception:
+        pass
+        
+    # If distance is too far (>500 miles) or it's international, FORCE flights over bus/train
+    if travel_style == "Budget Friendly" and dist_miles < 500 and not is_international and dist_miles > 0:
         from scraper import scrape_transit_costs
         transit_data = scrape_transit_costs(origin, destination)
         
-        bus_total = transit_data["bus"] * travelers
-        train_total = transit_data["train"] * travelers
+        # Round trip multipliers (Arrival + Departure)
+        bus_total = transit_data["bus"] * travelers * 2
+        train_total = transit_data["train"] * travelers * 2
         
         if bus_total < train_total:
-            flight_tickets_total = bus_total
-            transport_mode = "Bus & Travel"
+            flight_tickets_total = int(bus_total * 0.75) 
+            transport_mode = "Bus & Travel (Round Trip)"
         else:
-            flight_tickets_total = train_total
-            transport_mode = "Train & Travel"
-            
-        # Food and local transport are also cheaper if travelling budget friendly
-        total_food = int(1200 * duration * travelers)
-        total_transport = int(600 * duration * travelers)
-        total_attractions = int(1000 * duration * travelers)
-        
-    elif scraped_data and "estimated_flight_cost_per_person" in scraped_data:
-        flight_tickets_total = int(scraped_data.get("estimated_flight_cost_per_person", 20000) * travelers)
-        total_food = int(scraped_data.get("estimated_food_cost_per_day_per_person", 3200) * duration * travelers)
-        total_transport = int(scraped_data.get("estimated_transport_cost_per_day_per_person", 1600) * duration * travelers)
-        total_attractions = int(scraped_data.get("estimated_attractions_cost_per_day_per_person", 2400) * duration * travelers)
+            flight_tickets_total = int(train_total * 0.75)
+            transport_mode = "Train & Travel (Round Trip)"
     else:
-        food_per_day = 3200 * style_mult
-        transport_per_day = 1600 * style_mult
-        attractions_per_day = 2400 * style_mult
+        # Distance too far OR failed geocoding. Use Skyscanner for Flight estimate.
+        # If geocoding failed, we assume a far trip to be safe.
+        calc_dist = dist_miles if dist_miles > 0 else 1200
+        per_person_flight_round_trip = scrape_skyscanner_flights(origin, destination, calc_dist)
         
-        # Estimate base travel tickets dynamically based on distance
-        flight_tickets_total = 20000 * travelers # fallback
-        try:
-            origin_loc = geolocator.geocode(origin, timeout=5)
-            dest_loc = geolocator.geocode(destination, timeout=5)
-            if origin_loc and dest_loc:
-                dist_miles = geodesic((origin_loc.latitude, origin_loc.longitude), (dest_loc.latitude, dest_loc.longitude)).miles
-                # ₹12 per mile round-trip estimate per traveler
-                flight_tickets_total = int((dist_miles * 12 + 4000) * travelers)
-        except Exception as e:
-            print(f"Cost Estimator Geocode Error: {e}")
-            pass
-        
-        total_food = int(food_per_day * duration * travelers)
-        total_transport = int(transport_per_day * duration * travelers)
-        total_attractions = int(attractions_per_day * duration * travelers)
+        # Cross-reference with scraped_data if available (AI might have different estimates)
+        if scraped_data and "estimated_flight_cost_per_person" in scraped_data:
+            ai_flight = scraped_data["estimated_flight_cost_per_person"]
+            if ai_flight > 0:
+                # Use the cheaper of the two sources
+                per_person_flight_round_trip = min(per_person_flight_round_trip, ai_flight)
+                
+        flight_tickets_total = int(per_person_flight_round_trip * travelers)
+        transport_mode = "Flights & Travel (Round Trip)"
+                
+    intl_mult = 1.35 if is_international else 1.0
+    
+    # Scale all daily costs perfectly by the travel style
+    base_food = scraped_data.get("estimated_food_cost_per_day_per_person", 800) if scraped_data else 800
+    base_transport = scraped_data.get("estimated_transport_cost_per_day_per_person", 400) if scraped_data else 400
+    base_attractions = scraped_data.get("estimated_attractions_cost_per_day_per_person", 600) if scraped_data else 600
+    
+    total_food = int(base_food * style_mult * intl_mult * duration * travelers)
+    total_transport = int(base_transport * style_mult * intl_mult * duration * travelers)
+    total_attractions = int(base_attractions * style_mult * intl_mult * duration * travelers)
     
     return {
         "flight_cost": flight_tickets_total,

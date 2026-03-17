@@ -32,6 +32,12 @@ function TravelInputForm({ onSubmit, loading, initialDestination }) {
     origin: '', destination: initialDestination || '', budget: '', travelers: 1, travel_style: 'Budget Friendly', duration: '', gemini_key: 'AIzaSyDMoFVhZhSb4J9r7_I1eno3w69xbUE1TNM'
   });
 
+  useEffect(() => {
+    if (initialDestination) {
+      setFormData(prev => ({ ...prev, destination: initialDestination }));
+    }
+  }, [initialDestination]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (loading) return;
@@ -123,6 +129,25 @@ function HotelRecommendations({ hotels }) {
             </div>
             <div className="mt-auto font-black text-green-600 text-3xl border-t border-gray-100 pt-6 flex items-end">
               ₹{h.price} <span className="text-sm text-gray-400 font-semibold mb-2 ml-2">/ night</span>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function CulinaryHighlights({ culinary }) {
+  if (!culinary || culinary.length === 0) return null;
+  return (
+    <section className="mb-10 p-10 bg-white rounded-3xl shadow-lg border border-gray-50">
+      <h3 className="text-3xl font-bold flex items-center gap-3 mb-10 text-primary"><Utensils className="text-secondary" size={32} /> Local Culinary Prices</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {culinary.map((item, i) => (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} key={i} className="bg-background p-6 rounded-[24px] border border-gray-100 flex flex-col justify-between hover:border-accent hover:shadow-lg transition-all group">
+            <h4 className="font-bold text-lg mb-3 text-primary group-hover:text-accent transition-colors">{item.name}</h4>
+            <div className="mt-auto font-black text-green-600 text-2xl pt-4 border-t border-gray-100 flex items-end">
+              ₹{item.price}
             </div>
           </motion.div>
         ))}
@@ -255,7 +280,23 @@ export default function Planner() {
   const [planData, setPlanData] = useState(null);
   const [budgetConstraint, setBudgetConstraint] = useState(0);
 
+  const [recs, setRecs] = useState(null);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [selectedDest, setSelectedDest] = useState('');
+
   const initialDestination = location.state?.destination || '';
+
+  useEffect(() => {
+    const userId = localStorage.getItem('user_id');
+    if (userId && !initialDestination && !selectedDest) {
+      setRecsLoading(true);
+      fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/user/${userId}/recommendations`)
+        .then(res => res.json())
+        .then(data => setRecs(data.recommendations))
+        .catch(console.error)
+        .finally(() => setRecsLoading(false));
+    }
+  }, [initialDestination, selectedDest]);
 
   const fetchPlan = async (formData) => {
     setLoading(true);
@@ -289,7 +330,33 @@ export default function Planner() {
               <h2 className="text-6xl font-black text-primary mb-6 tracking-tight">Trip <span className="text-accent">Architect</span></h2>
               <p className="text-xl text-gray-500 max-w-2xl mx-auto font-medium">Knowing where you want to go is half the battle. Let our AI handle the logistics, costs, and itineraries.</p>
             </div>
-            <TravelInputForm onSubmit={fetchPlan} loading={loading} initialDestination={initialDestination} />
+            
+            {recs && !selectedDest && !initialDestination && (
+              <div className="mb-16">
+                <h3 className="text-3xl font-black text-primary mb-6 flex items-center gap-3"><Star className="text-accent" fill="currentColor" /> Highly Recommended for You</h3>
+                <p className="text-gray-500 mb-6 -mt-2">Based on your global travel preferences & collaborative trends.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {recs.map((rec, i) => (
+                    <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay: i*0.1}} key={i} 
+                      onClick={() => setSelectedDest(rec.name)} className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 cursor-pointer hover:border-secondary transition-all hover:shadow-xl group">
+                      <h4 className="font-bold text-2xl text-primary group-hover:text-secondary mb-1">{rec.name}</h4>
+                      <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-4">{rec.country}</p>
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-3 py-1 rounded-full">{rec.climate}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-3 py-1 rounded-full">{rec.travel_type}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/10 text-accent px-3 py-1 rounded-full">{rec.budget_level}</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        <span className="flex items-center gap-2 font-bold text-sm text-yellow-500"><Star size={16} fill="currentColor"/> {rec.rating}</span>
+                        <span className="text-xs font-black text-secondary group-hover:text-accent uppercase transition-colors">Select Dest ➔</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <TravelInputForm onSubmit={fetchPlan} loading={loading} initialDestination={initialDestination || selectedDest} />
           </motion.div>
         )}
 
@@ -311,6 +378,7 @@ export default function Planner() {
             <TripOverview data={planData} />
             <MapSection hotels={planData.hotels} attractions={planData.attractions} />
             <HotelRecommendations hotels={planData.hotels} />
+            <CulinaryHighlights culinary={planData.local_culinary} />
             <Itinerary itinerary={planData.itinerary} />
             <EstimatedBudget costs={planData.costs} totalBudget={budgetConstraint} />
           </motion.div>

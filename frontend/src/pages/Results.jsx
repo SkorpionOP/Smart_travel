@@ -9,20 +9,20 @@ export default function Results() {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const answers = location.state?.answers;
+    const survey = location.state?.survey;
 
     useEffect(() => {
-        if (!answers) {
+        if (!survey) {
             navigate('/quiz');
             return;
         }
 
         const fetchResults = async () => {
             try {
-                const res = await fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/recommendations`, {
+                const res = await fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/quiz/recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(answers)
+                    body: JSON.stringify({ survey: location.state.survey, history: location.state.history })
                 });
                 const data = await res.json();
                 setResults(data.recommendations);
@@ -34,7 +34,7 @@ export default function Results() {
         };
 
         fetchResults();
-    }, [answers, navigate]);
+    }, [survey, navigate, location.state]);
 
     if (loading) return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-background">

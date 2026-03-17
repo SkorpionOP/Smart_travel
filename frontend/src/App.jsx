@@ -1,12 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Home, Compass, Map as MapIcon } from 'lucide-react';
+import { Home, Compass, Map as MapIcon, User } from 'lucide-react';
 
 // Pages
 import Landing from './pages/Landing';
 import Questionnaire from './pages/Questionnaire';
 import Results from './pages/Results';
 import Planner from './pages/Planner';
+import Profile from './pages/Profile';
 
 function Navbar() {
   const location = useLocation();
@@ -26,6 +27,7 @@ function Navbar() {
           <div className="flex gap-4 md:gap-8 font-bold text-sm uppercase tracking-widest text-primary/60">
               <Link to="/quiz" className={`hover:text-secondary transition-colors ${location.pathname === '/quiz' || location.pathname === '/results' ? 'text-secondary' : ''}`}>AI Quiz</Link>
               <Link to="/planner" className={`hover:text-secondary transition-colors ${location.pathname === '/planner' ? 'text-secondary' : ''}`}>Planner</Link>
+              <Link to="/profile" className={`hover:text-secondary transition-colors ${location.pathname === '/profile' ? 'text-secondary' : ''}`}>Profile</Link>
           </div>
         </div>
       </nav>
@@ -57,6 +59,10 @@ function Navbar() {
             <MapIcon size={20} className={location.pathname === '/planner' ? 'fill-accent text-accent' : ''} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Planner</span>
           </Link>
+          <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/profile' ? 'text-accent' : 'text-gray-400'}`}>
+            <User size={20} className={location.pathname === '/profile' ? 'fill-accent text-accent' : ''} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Auth</span>
+          </Link>
         </div>
       </nav>
     </>
@@ -73,6 +79,7 @@ export default function App() {
           <Route path="/quiz" element={<Questionnaire />} />
           <Route path="/results" element={<Results />} />
           <Route path="/planner" element={<Planner />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </div>
     </Router>

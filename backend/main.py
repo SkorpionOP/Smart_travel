@@ -4,13 +4,18 @@ from pydantic import BaseModel
 from typing import Optional
 
 import random
-from scraper import scrape_destination_info
+from scraper import scrape_destination_info, scrape_local_culinary
 from gemini_agent import get_gemini_trip_data
 from planner import generate_itinerary
 from cost_estimator import calculate_costs
 from real_scraper import run_playwright_scraper
 from dataset import destinations
+from fastapi import HTTPException
+from database import init_db, get_db, hash_password
+from recommender import get_hybrid_recommendations
+from quiz_ml import get_ml_recommendations, create_daily_plan
 
+init_db()
 app = FastAPI(title="Smart Travel AI API")
 
 app.add_middleware(
@@ -28,6 +33,27 @@ class Preferences(BaseModel):
     vibe: str
     food: str
 
+class QuizMLRequest(BaseModel):
+    survey: list[float]  # [Adventure, Relaxation, Culture, Nature, Social]
+    history: list[dict] = [] # Optional past ratings
+
+
+class UserRegister(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserPrefModel(BaseModel):
+    user_id: int
+    budget_range: str
+    preferred_climate: str
+    travel_type: str
+    preferred_region: str
+
 class TravelRequest(BaseModel):
     origin: str
     destination: str
@@ -44,6 +70,8 @@ def generate_plan(req: TravelRequest):
     if req.gemini_key and req.gemini_key.strip() != "":
         scraped_data = get_gemini_trip_data(req.origin, req.destination, req.gemini_key, req.budget, req.travelers, req.travel_style)
         
+    local_culinary, total_food_per_day = scrape_local_culinary(req.destination)
+
     if scraped_data is None:
         wiki_data = scrape_destination_info(req.destination)
         real_hotels, real_attractions = run_playwright_scraper(req.destination, req.budget)
@@ -51,8 +79,12 @@ def generate_plan(req: TravelRequest):
         scraped_data = {
             "description": wiki_data["description"],
             "hotels": real_hotels if real_hotels else wiki_data["hotels"],
-            "attractions": real_attractions if real_attractions else wiki_data["attractions"]
+            "attractions": real_attractions if real_attractions else wiki_data["attractions"],
         }
+    
+    scraped_data["local_culinary"] = local_culinary
+    if "estimated_food_cost_per_day_per_person" not in scraped_data or scraped_data.get("estimated_food_cost_per_day_per_person", 0) == 0:
+        scraped_data["estimated_food_cost_per_day_per_person"] = total_food_per_day
         
         # Add mock coordinates if geocoding failed so the map doesn't break
         for h in scraped_data["hotels"]:
@@ -90,7 +122,8 @@ def generate_plan(req: TravelRequest):
         "hotels": scraped_data["hotels"],
         "attractions": scraped_data["attractions"], # Return full attractions for map
         "itinerary": itinerary,
-        "costs": costs
+        "costs": costs,
+        "local_culinary": scraped_data.get("local_culinary", [])
     }
 
 @app.post("/api/recommendations")
@@ -116,6 +149,69 @@ def get_recommendations(prefs: Preferences):
     # Sort by score, then by rating as tie breaker
     scored_destinations.sort(key=lambda x: (x["score"], x["destination"]["rating"]), reverse=True)
     return {"recommendations": [item["destination"] for item in scored_destinations[:5]]}
+
+@app.post("/api/quiz/recommendations")
+def quiz_recommendations(req: QuizMLRequest):
+    # ML Engine processes vectors -> [Adventure, Relaxation, Culture, Nature, Social]
+    top_matches = get_ml_recommendations(req.survey, req.history)
+    itinerary = create_daily_plan(top_matches)
+    
+    return {
+        "recommendations": top_matches,
+        "itinerary": itinerary
+    }
+
+# --- MVP Auth & Recommender Endpoints ---
+
+@app.post("/api/auth/register")
+def register(user: UserRegister):
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO users(name, email, password_hash) VALUES (?,?,?)", 
+                  (user.name, user.email, hash_password(user.password)))
+        conn.commit()
+        user_id = c.lastrowid
+        return {"message": "User registered successfully", "user_id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Email might already exist")
+    finally:
+        conn.close()
+
+@app.post("/api/auth/login")
+def login(user: UserLogin):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, name FROM users WHERE email=? AND password_hash=?", 
+              (user.email, hash_password(user.password)))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"message": "Login successful", "user_id": row["id"], "name": row["name"]}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.post("/api/user/preferences")
+def set_preferences(prefs: UserPrefModel):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO preferences(user_id, budget_range, preferred_climate, travel_type, preferred_region) 
+        VALUES (?,?,?,?,?) 
+        ON CONFLICT(user_id) DO UPDATE SET 
+        budget_range=excluded.budget_range, 
+        preferred_climate=excluded.preferred_climate, 
+        travel_type=excluded.travel_type, 
+        preferred_region=excluded.preferred_region
+    """, (prefs.user_id, prefs.budget_range, prefs.preferred_climate, prefs.travel_type, prefs.preferred_region))
+    conn.commit()
+    conn.close()
+    return {"message": "Preferences saved successfully"}
+
+@app.get("/api/user/{user_id}/recommendations")
+def hybrid_recommend(user_id: int):
+    # Returns the list of dicts directly
+    results = get_hybrid_recommendations(user_id)
+    return {"recommendations": results}
 
 if __name__ == "__main__":
     import uvicorn
