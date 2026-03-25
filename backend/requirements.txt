@@ -6,3 +6,4 @@ beautifulsoup4
 geopy
 g4f
 google-genai
+python-dotenv

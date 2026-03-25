@@ -5,6 +5,7 @@ import { MapPin, DollarSign, IndianRupee, Users, Calendar, Compass, Star, Map as
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { divIcon } from 'leaflet';
+import { API_BASE_URL } from '../config';
 
 const createIcon = (color) => divIcon({
   className: 'custom-leaflet-icon',
@@ -369,7 +370,7 @@ export default function Planner() {
     const userId = localStorage.getItem('user_id');
     if (userId && !initialDestination && !selectedDest) {
       setRecsLoading(true);
-      fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/user/${userId}/recommendations`)
+      fetch(`${API_BASE_URL}/api/user/${userId}/recommendations`)
         .then(res => res.json())
         .then(data => setRecs(data.recommendations))
         .catch(console.error)
@@ -383,7 +384,7 @@ export default function Planner() {
     setLastFormData(formData);
     setTripSaved(false);
     try {
-      const res = await fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/plan`, {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

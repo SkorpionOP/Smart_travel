@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, ShieldCheck, Mail, Lock, Heart, LogIn, Star, MapPin, Calendar, Trash2, TrendingUp, ChevronRight, Award, Sparkles } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-const API = 'https://lmcjgntt-8000.inc1.devtunnels.ms';
+import { API_BASE_URL } from '../config';
 
 function StarRating({ value, onChange }) {
   const [hover, setHover] = useState(0);
@@ -106,7 +105,7 @@ export default function Profile() {
     setLoading(true);
     try {
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
-      const res = await fetch(`${API}${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
       });
       const data = await res.json();
@@ -128,7 +127,7 @@ export default function Profile() {
   const handlePrefs = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
-      const res = await fetch(`${API}/api/user/preferences`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/preferences`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: parseInt(userId), ...prefs })
       });

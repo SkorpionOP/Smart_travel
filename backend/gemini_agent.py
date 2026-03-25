@@ -17,7 +17,7 @@ class Hotel(BaseModel):
     lat: float
     lng: float
 
-class TripData(BaseModel):
+class TripData(BaseModel):e
     description: str
     estimated_flight_cost_per_person: int
     estimated_food_cost_per_day_per_person: int

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, MapPin, ArrowRight, RefreshCcw, Sparkles, X } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function Results() {
     const location = useLocation();
@@ -22,7 +23,7 @@ export default function Results() {
 
         const fetchResults = async () => {
             try {
-                const res = await fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/quiz/recommendations`, {
+                const res = await fetch(`${API_BASE_URL}/api/quiz/recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ survey: location.state.survey, history: location.state.history })
@@ -44,7 +45,7 @@ export default function Results() {
         setModalOpen(true);
         setWhyItData({ city: dest.City || dest.name.split(',')[0], reasons: [] });
         try {
-            const res = await fetch(`https://lmcjgntt-8000.inc1.devtunnels.ms/api/quiz/why-it`, {
+            const res = await fetch(`${API_BASE_URL}/api/quiz/why-it`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 

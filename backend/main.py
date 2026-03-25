@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import os
 
 import random
 from scraper import scrape_destination_info, scrape_local_culinary
@@ -15,9 +16,13 @@ from database import init_db, get_db, hash_password
 from recommender import get_hybrid_recommendations
 from quiz_ml import get_ml_recommendations, create_daily_plan
 from gemini_agent import get_gemini_trip_data, get_gemini_why_it
+from dotenv import load_dotenv
 
+load_dotenv()
 init_db()
 app = FastAPI(title="Smart Travel AI API")
+
+DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,7 +78,7 @@ class TravelRequest(BaseModel):
 def generate_plan(req: TravelRequest):
     # 1. Scrape data (using Gemini if key provided, else fallback)
     scraped_data = None
-    actual_key = req.gemini_key if req.gemini_key and req.gemini_key.strip() != "" else "AIzaSyDMoFVhZhSb4J9r7_I1eno3w69xbUE1TNM"
+    actual_key = req.gemini_key if req.gemini_key and req.gemini_key.strip() != "" else DEFAULT_GEMINI_KEY
     if actual_key:
         scraped_data = get_gemini_trip_data(req.origin, req.destination, actual_key, req.budget, req.travelers, req.travel_style)
         
@@ -170,7 +175,7 @@ def quiz_recommendations(req: QuizMLRequest):
 
 @app.post("/api/quiz/why-it")
 def why_this_city(req: WhyItRequest):
-    key = req.gemini_key if req.gemini_key else 'AIzaSyDMoFVhZhSb4J9r7_I1eno3w69xbUE1TNM'
+    key = req.gemini_key if req.gemini_key else DEFAULT_GEMINI_KEY
     return get_gemini_why_it(req.city, req.spots, key)
 
 # --- MVP Auth & Recommender Endpoints ---
