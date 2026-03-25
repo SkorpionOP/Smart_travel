@@ -24,9 +24,15 @@ app = FastAPI(title="Smart Travel AI API")
 
 DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://wanderrly.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
