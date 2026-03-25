@@ -3,7 +3,20 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-page: #F5F7FA;
+    --bg-body: #F5F7FA;
+  }
+  html.dark {
+    --bg-page: #030712;
+    --bg-body: #030712;
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-gray-800 font-sans;
+    background-color: var(--bg-body);
+    @apply text-gray-800 font-sans transition-colors duration-300;
+  }
+  html.dark body {
+    @apply text-white;
   }
 }

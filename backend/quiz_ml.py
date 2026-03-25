@@ -51,30 +51,67 @@ def get_ml_recommendations(survey, history=[]):
     load_data()
     user_profile = evolve_user_profile(survey, history)
     
-    # Query the model: find destinations nearest to the user profile
-    distances, indices = engine.kneighbors(user_profile.reshape(1, -1))
+    # Query more neighbors to get enough distinct cities
+    n_neighbors = min(100, len(df))
+    distances, indices = engine.kneighbors(user_profile.reshape(1, -1), n_neighbors=n_neighbors)
     
-    # Extract the recommended destinations
-    recommendations = df.iloc[indices[0]].copy()
-    recommendations['Match_Score'] = 1 - distances[0] # Convert distance to similarity %
+    cities_map = {}
     
-    # Convert to list of dicts for API response
-    results = []
-    for _, row in recommendations.sort_values(by='Match_Score', ascending=False).iterrows():
-        # Create a dict that matches the frontend expectation format, similar to our old destinations dataset
-        dest_name = f"{row['Name']}, {row['City']}, {row['State']}"
-        results.append({
-            "id": str(row['Name']).lower().replace(' ', '_'),
-            "name": dest_name,
-            "image": scrape_wikipedia_image(row['Name']),
+    for dist, idx in zip(distances[0], indices[0]):
+        row = df.iloc[idx]
+        city = row['City']
+        state = row['State']
+        match_score = 1 - dist
+        
+        if city not in cities_map:
+            cities_map[city] = {
+                "City": city,
+                "State": state,
+                "Match_Score": match_score,
+                "Spots": []
+            }
+            
+        cities_map[city]["Spots"].append({
+            "name": row['Name'],
+            "type": row.get('Type', 'place'),
             "rating": round(row.get('Google review rating', 4.5), 1),
-            "description": f"A notable {row.get('Type', 'place')} historically significant for {row.get('Significance', 'visitors')}.",
-            "tags": [t for t in traits if row[t] > 0.5],
-            "Match_Score": round(row['Match_Score'] * 100, 1),
-            "City": row['City'],
+            "Match_Score": round(match_score * 100, 1),
             "time_needed": row.get('time needed to visit in hrs', 2)
         })
-    return results[:5]
+
+    # Sort cities by Match Score of their highest matching spot
+    sorted_cities = sorted(list(cities_map.values()), key=lambda x: x["Match_Score"], reverse=True)
+    
+    top_5_cities = sorted_cities[:5]
+    
+    results = []
+    
+    for c in top_5_cities:
+        city_name = str(c['City'])
+        top_spots = c['Spots'][:5] # Top 5 places
+        spot_names = [s['name'] for s in top_spots]
+        
+        # Determine city tags based on mean of traits for this city
+        city_rows = df[df['City'] == city_name]
+        mean_traits = city_rows[traits].mean()
+        city_tags = [t for t in traits if mean_traits[t] > 0.4]
+        if not city_tags:
+            city_tags = [traits[int(np.argmax(mean_traits.values))]] # at least one
+            
+        results.append({
+            "id": city_name.lower().replace(' ', '_'),
+            "name": f"{city_name}, {c['State']}",
+            "image": scrape_wikipedia_image(city_name),
+            "rating": round(top_spots[0]['rating'], 1) if top_spots else 4.5,
+            "description": f"Based on your vibe, {city_name} is the ultimate go-to! It's perfectly suited for your interests. Here are some of the best matching spots in {city_name} for you.",
+            "tags": city_tags,
+            "Match_Score": round(c['Match_Score'] * 100, 1),
+            "City": city_name,
+            "spots": top_spots,
+            "time_needed": sum(s['time_needed'] for s in top_spots)
+        })
+        
+    return results
 
 def create_daily_plan(rec_list, max_hours=8):
     plan = []

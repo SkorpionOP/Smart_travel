@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from database import init_db, get_db, hash_password
 from recommender import get_hybrid_recommendations
 from quiz_ml import get_ml_recommendations, create_daily_plan
+from gemini_agent import get_gemini_trip_data, get_gemini_why_it
 
 init_db()
 app = FastAPI(title="Smart Travel AI API")
@@ -37,6 +38,10 @@ class QuizMLRequest(BaseModel):
     survey: list[float]  # [Adventure, Relaxation, Culture, Nature, Social]
     history: list[dict] = [] # Optional past ratings
 
+class WhyItRequest(BaseModel):
+    city: str
+    spots: list[str]
+    gemini_key: Optional[str] = None
 
 class UserRegister(BaseModel):
     name: str
@@ -62,19 +67,21 @@ class TravelRequest(BaseModel):
     travel_style: str
     duration: Optional[int] = None
     gemini_key: Optional[str] = None
+    spots: Optional[list[str]] = None
 
 @app.post("/api/plan")
 def generate_plan(req: TravelRequest):
     # 1. Scrape data (using Gemini if key provided, else fallback)
     scraped_data = None
-    if req.gemini_key and req.gemini_key.strip() != "":
-        scraped_data = get_gemini_trip_data(req.origin, req.destination, req.gemini_key, req.budget, req.travelers, req.travel_style)
+    actual_key = req.gemini_key if req.gemini_key and req.gemini_key.strip() != "" else "AIzaSyDMoFVhZhSb4J9r7_I1eno3w69xbUE1TNM"
+    if actual_key:
+        scraped_data = get_gemini_trip_data(req.origin, req.destination, actual_key, req.budget, req.travelers, req.travel_style)
         
     local_culinary, total_food_per_day = scrape_local_culinary(req.destination)
 
     if scraped_data is None:
         wiki_data = scrape_destination_info(req.destination)
-        real_hotels, real_attractions = run_playwright_scraper(req.destination, req.budget)
+        real_hotels, real_attractions = run_playwright_scraper(req.destination, req.budget, req.spots)
         
         scraped_data = {
             "description": wiki_data["description"],
@@ -160,6 +167,11 @@ def quiz_recommendations(req: QuizMLRequest):
         "recommendations": top_matches,
         "itinerary": itinerary
     }
+
+@app.post("/api/quiz/why-it")
+def why_this_city(req: WhyItRequest):
+    key = req.gemini_key if req.gemini_key else 'AIzaSyDMoFVhZhSb4J9r7_I1eno3w69xbUE1TNM'
+    return get_gemini_why_it(req.city, req.spots, key)
 
 # --- MVP Auth & Recommender Endpoints ---
 

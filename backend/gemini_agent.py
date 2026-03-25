@@ -26,6 +26,38 @@ class TripData(BaseModel):
     hotels: list[Hotel]
     attractions: list[Attraction]
 
+class WhyItReason(BaseModel):
+    name: str
+    description: str
+
+class WhyItResponse(BaseModel):
+    reasons: list[WhyItReason]
+
+from scraper import scrape_wikipedia_image, scrape_destination_info
+
+def get_gemini_why_it(city: str, spots: list[str], key: str):
+    print(f"Bypassing Gemini for Why-It -> Fast Scraping {city} spots...")
+    reasons = []
+    
+    for spot in spots:
+        # 1. Fetch short description from Wikipedia
+        dest_info = scrape_destination_info(spot)
+        desc = dest_info.get("description", "A fantastic attraction worth exploring.")
+        # Crop description to a reasonable length (2 sentences max)
+        sentences = desc.split('. ')
+        short_desc = '. '.join(sentences[:2]) + ('.' if not sentences[0].endswith('.') else '')
+        
+        # 2. Add Wikipedia image
+        img = scrape_wikipedia_image(spot)
+        
+        reasons.append({
+            "name": spot,
+            "description": short_desc,
+            "image": img
+        })
+        
+    return {"reasons": reasons}
+
 def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float, travelers: int, style: str):
     try:
         client = genai.Client(api_key=key)
