@@ -47,21 +47,66 @@ def evolve_user_profile(survey, history):
     refined_profile = (survey_vec * 0.5) + (experience_vec * 0.5)
     return np.clip(refined_profile, 0, 1)
 
-def get_ml_recommendations(survey, history=[]):
+def get_ml_recommendations(survey, history=[], vibe=None):
     load_data()
     user_profile = evolve_user_profile(survey, history)
     
     # Query more neighbors to get enough distinct cities
-    n_neighbors = min(100, len(df))
+    n_neighbors = min(150, len(df)) # increased pool
     distances, indices = engine.kneighbors(user_profile.reshape(1, -1), n_neighbors=n_neighbors)
     
     cities_map = {}
     
+    # Define vibe keywords for boosting
+    vibe_keywords = {
+        'mountain': ['hill', 'mountain', 'peak', 'valley', 'trek', 'himalaya', 'auli', 'shimla', 'manali', 'munnar', 'coorg', 'ooty', 'kodaikanal', 'altitude'],
+        'beach': ['beach', 'island', 'coast', 'sea', 'waterfall', 'goa', 'kerala', 'pondicherry', 'daman', 'ocean'],
+        'temple': ['temple', 'shrine', 'spiritual', 'religious', 'monastery', 'dargah', 'church', 'mosque', 'guru'],
+        'city': ['shopping', 'mall', 'metro', 'market', 'historical', 'museum', 'monument', 'fort', 'palace']
+    }
+    
+    # States for broad categorization
+    mountain_states = ['Himachal Pradesh', 'Uttarakhand', 'Sikkim', 'Ladakh', 'Jammu and Kashmir', 'Arunachal Pradesh', 'Meghalaya', 'Nagaland', 'Mizoram']
+    beach_states = ['Goa', 'Andaman and Nicobar Islands', 'Puducherry', 'Lakshadweep', 'Kerala', 'Tamil Nadu', 'Andhra Pradesh'] # Coastal states
+
     for dist, idx in zip(distances[0], indices[0]):
         row = df.iloc[idx]
         city = row['City']
         state = row['State']
         match_score = 1 - dist
+        
+        # Categorical Boosting & Penalizing
+        boost = 0.0
+        if vibe:
+            vibe_lower = vibe.lower()
+            keywords = vibe_keywords.get(vibe_lower, [])
+            
+            # Combine relevant text for checking
+            desc_text = f"{row.get('Type', '')} {row.get('Significance', '')} {row.get('Name', '')}".lower()
+            
+            # 1. Direct Keyword Match (Strong Boost)
+            if any(kw in desc_text for kw in keywords):
+                boost += 0.5
+            
+            # 2. State match (Medium Boost)
+            if vibe_lower == 'mountain' and state in mountain_states:
+                boost += 0.3
+            elif vibe_lower == 'beach' and state in beach_states and 'beach' in desc_text:
+                boost += 0.3
+            
+            # 3. PENALTY for wrong vibe (Antivibe)
+            # If looking for mountain, but it's a beach or a generic city mall
+            if vibe_lower == 'mountain':
+                if any(kw in desc_text for kw in ['beach', 'mall', 'metro', 'shopping']):
+                    boost -= 0.5
+            elif vibe_lower == 'beach':
+                if any(kw in desc_text for kw in ['trek', 'mountain', 'peak', 'mall']):
+                    boost -= 0.5
+            elif vibe_lower == 'city':
+                if any(kw in desc_text for kw in ['trek', 'mountain', 'remote']):
+                    boost -= 0.3
+
+        match_score += boost
         
         if city not in cities_map:
             cities_map[city] = {
@@ -79,7 +124,7 @@ def get_ml_recommendations(survey, history=[]):
             "time_needed": row.get('time needed to visit in hrs', 2)
         })
 
-    # Sort cities by Match Score of their highest matching spot
+    # Re-sort cities by boosted Match Score
     sorted_cities = sorted(list(cities_map.values()), key=lambda x: x["Match_Score"], reverse=True)
     
     top_5_cities = sorted_cities[:5]

@@ -186,9 +186,12 @@ export default function Questionnaire() {
     const [accumulatedScores, setAccumulatedScores] = useState({
         Adventure: 0, Relaxation: 0, Culture: 0, Nature: 0, Social: 0
     });
+    const [selectedVibe, setSelectedVibe] = useState(null);
     const navigate = useNavigate();
 
     const handleSelect = (option) => {
+        if (option.branch) setSelectedVibe(option.branch);
+        
         // Update scores
         const newScores = { ...accumulatedScores };
         if (option.scores) {
@@ -210,14 +213,12 @@ export default function Questionnaire() {
             setTimeout(() => setCurrentStep(prev => prev + 1), 300);
         } else {
             // Finalize scores: Normalize to 0-1 range
-            // We have 7 questions total now (initial 2 + branch 5).
-            // Normalizing by a factor of 2.5 seems safe given the weights.
             const finalSurveyArray = traitMap.map(trait => {
                 const raw = newScores[trait];
                 return Math.min(1.0, raw / 2.5); 
             });
 
-            setTimeout(() => navigate('/results', { state: { survey: finalSurveyArray, history: [] } }), 300);
+            setTimeout(() => navigate('/results', { state: { survey: finalSurveyArray, history: [], vibe: selectedVibe } }), 300);
         }
     };
 

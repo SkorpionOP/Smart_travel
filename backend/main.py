@@ -48,6 +48,7 @@ class Preferences(BaseModel):
 class QuizMLRequest(BaseModel):
     survey: list[float]  # [Adventure, Relaxation, Culture, Nature, Social]
     history: list[dict] = [] # Optional past ratings
+    vibe: Optional[str] = None # Optional branch preference (mountain, beach, etc.)
 
 class WhyItRequest(BaseModel):
     city: str
@@ -171,7 +172,7 @@ def get_recommendations(prefs: Preferences):
 @app.post("/api/quiz/recommendations")
 def quiz_recommendations(req: QuizMLRequest):
     # ML Engine processes vectors -> [Adventure, Relaxation, Culture, Nature, Social]
-    top_matches = get_ml_recommendations(req.survey, req.history)
+    top_matches = get_ml_recommendations(req.survey, req.history, req.vibe)
     itinerary = create_daily_plan(top_matches)
     
     return {
