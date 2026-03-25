@@ -6,7 +6,7 @@ import os
 
 import random
 from scraper import scrape_destination_info, scrape_local_culinary
-from gemini_agent import get_gemini_trip_data
+# Removed redundant import (merged with line 18)
 from planner import generate_itinerary
 from cost_estimator import calculate_costs
 from real_scraper import run_playwright_scraper
