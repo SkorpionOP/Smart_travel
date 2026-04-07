@@ -76,10 +76,11 @@ def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float,
             3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
             4. Average estimated daily local transport cost per person in INR in {destination}.
             5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
-            6. A list of 5 cheapest/most budget-friendly recommended hotels in {destination} that fit their budget.
-            7. A list of 5 Pg with food in {destination} that fit their budget.
-            8. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
-        elif style.lower() == "luxury":
+            6. A comprehensive list of ALL notable budget-friendly hotels in {destination} — include every well-known option, do not cap the count.
+            7. A comprehensive list of ALL notable PGs with food in {destination} — include every well-known option, do not cap the count.
+            8. A list of ALL recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).
+            """
+        elif style_lower == "luxury":
             prompt = f"""
             You are an expert travel agent. The user wants to travel from {origin} to {destination}.
             They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
@@ -90,9 +91,10 @@ def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float,
             3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
             4. Average estimated daily local transport cost per person in INR in {destination}.
             5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
-            6. A list of 5 top-class, luxury 5-star recommended hotels in {destination}.
-            7. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
-        elif style.lower() == "quick":
+            6. A comprehensive list of ALL top-class luxury 5-star hotels in {destination} — include every well-known option, do not cap the count.
+            7. A list of ALL recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).
+            """
+        elif style_lower == "quick":
             prompt = f"""
             You are an expert travel agent. The user wants to travel from {origin} to {destination}.
             They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
@@ -103,8 +105,9 @@ def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float,
             3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
             4. Average estimated daily local transport cost per person in INR in {destination}.
             5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
-            6. A list of 5 centrally located recommended hotels in {destination} that are closest to the city center.
-            7. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
+            6. A comprehensive list of ALL centrally located hotels in {destination} closest to the city center — include every well-known option, do not cap the count.
+            7. A list of ALL recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).
+            """
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
@@ -116,17 +119,15 @@ def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float,
         
         data = json.loads(response.text)
         
-        # Sort hotels according to travel style
         if "hotels" in data:
             if style_lower == "budget friendly":
                 data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("price", 999999))
             elif style_lower == "quick":
                 data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("distance_from_center", 999999))
-            else: # Luxury or others
+            else:
                 data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("rating", 0), reverse=True)
             
         return data
     except Exception as e:
         print(f"Gemini API failed: {e}")
-        # Fallback to the non-AI web scraper
         return None
