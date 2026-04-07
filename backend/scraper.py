@@ -76,7 +76,8 @@ def scrape_destination_info(destination: str):
         f"{destination} Observation Deck",
         f"Old Town {destination}",
         f"{destination} Art Gallery",
-        f"Botanical Gardens {destination}"
+        f"Botanical Gardens {destination}",
+        f"Famous Temples of {destination}"
     ]
     random.shuffle(attractions)
     selected_attractions = sorted(attractions[:random.randint(4, 8)])
@@ -224,14 +225,14 @@ def scrape_local_culinary(destination: str):
         # Fallback
         local_culinary = [
             {"name": "Local Bottled Water", "price": 20},
-            {"name": "Local Coffee/Tea", "price": 50},
+            {"name": "Local Coffee/Tea", "price": 20},
             {"name": "Street Food Snack", "price": 100},
             {"name": "Inexpensive Restaurant Meal", "price": 300}
         ]
         total_food_per_day = 1200
         
     # Ensure numbers aren't wildly wrong, scaling budget defaults down
-    if total_food_per_day < 200: total_food_per_day = 500
+    if total_food_per_day < 200: total_food_per_day = 300
     if total_food_per_day > 5000: total_food_per_day = 5000
     
     return local_culinary, total_food_per_day

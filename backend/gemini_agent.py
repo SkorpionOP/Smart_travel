@@ -3,6 +3,7 @@ from google import genai
 from google.genai import types
 from scraper import scrape_destination_info
 from pydantic import BaseModel
+from typing import Optional
 
 class Attraction(BaseModel):
     name: str
@@ -14,6 +15,7 @@ class Hotel(BaseModel):
     price: int
     rating: float
     distance_from_center: float
+    max_capacity: int
     lat: float
     lng: float
 
@@ -24,6 +26,7 @@ class TripData(BaseModel):
     estimated_transport_cost_per_day_per_person: int
     estimated_attractions_cost_per_day_per_person: int
     hotels: list[Hotel]
+    pgs: Optional[list[Hotel]] = None
     attractions: list[Attraction]
 
 class WhyItReason(BaseModel):
@@ -61,21 +64,47 @@ def get_gemini_why_it(city: str, spots: list[str], key: str):
 def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float, travelers: int, style: str):
     try:
         client = genai.Client(api_key=key)
+        style_lower = style.lower()
+        if style_lower == "budget friendly":
+            prompt = f"""
+            You are an expert travel agent. The user wants to travel from {origin} to {destination}.
+            They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
         
-        prompt = f"""
-        You are an expert travel agent. The user wants to travel from {origin} to {destination}.
-        They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
+            Please provide the following:
+            1. A detailed description of {destination} as a travel destination. 
+            2. Average estimated round-trip Train(Sleeper Class) cost per person in INR from {origin} to {destination}.
+            3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
+            4. Average estimated daily local transport cost per person in INR in {destination}.
+            5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
+            6. A list of 5 cheapest/most budget-friendly recommended hotels in {destination} that fit their budget.
+            7. A list of 5 Pg with food in {destination} that fit their budget.
+            8. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
+        elif style.lower() == "luxury":
+            prompt = f"""
+            You are an expert travel agent. The user wants to travel from {origin} to {destination}.
+            They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
         
-        Please provide the following:
-        1. A detailed description of {destination} as a travel destination.
-        2. Average estimated round-trip flight cost per person in INR from {origin} to {destination}.
-        3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
-        4. Average estimated daily local transport cost per person in INR in {destination}.
-        5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
-        6. A list of 5 realistic recommended hotels in {destination} that fit their budget.
-        7. A list of 6-8 recommended attractions in {destination}.
-        """
+            Please provide the following:
+            1. A detailed description of {destination} as a travel destination. 
+            2. Average estimated round-trip Train(First Class) cost per person in INR from {origin} to {destination}.
+            3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
+            4. Average estimated daily local transport cost per person in INR in {destination}.
+            5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
+            6. A list of 5 top-class, luxury 5-star recommended hotels in {destination}.
+            7. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
+        elif style.lower() == "quick":
+            prompt = f"""
+            You are an expert travel agent. The user wants to travel from {origin} to {destination}.
+            They have a budget of ${budget} for {travelers} traveler(s), and prefer a '{style}' travel style.
         
+            Please provide the following:
+            1. A detailed description of {destination} as a travel destination. 
+            2. Average estimated round-trip Flight cost per person in INR from {origin} to {destination}.
+            3. Average estimated daily food cost per person in INR in {destination} for a '{style}' style.
+            4. Average estimated daily local transport cost per person in INR in {destination}.
+            5. Average estimated daily attractions/sightseeing cost per person in INR in {destination}.
+            6. A list of 5 centrally located recommended hotels in {destination} that are closest to the city center.
+            7. A list of at most 5 recommended attractions per day in {destination}, scheduled during their peak 'golden hours' (specific times of day when the lighting, weather, and crowd levels are most ideal for that specific location).            """
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
@@ -87,9 +116,14 @@ def get_gemini_trip_data(origin: str, destination: str, key: str, budget: float,
         
         data = json.loads(response.text)
         
-        # Sort hotels by rating descending
+        # Sort hotels according to travel style
         if "hotels" in data:
-            data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("rating", 0), reverse=True)
+            if style_lower == "budget friendly":
+                data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("price", 999999))
+            elif style_lower == "quick":
+                data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("distance_from_center", 999999))
+            else: # Luxury or others
+                data["hotels"] = sorted(data["hotels"], key=lambda x: x.get("rating", 0), reverse=True)
             
         return data
     except Exception as e:

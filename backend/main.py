@@ -139,6 +139,7 @@ def generate_plan(req: TravelRequest):
         "description": scraped_data["description"],
         "duration": calculated_duration,
         "hotels": scraped_data["hotels"],
+        "pgs": scraped_data.get("pgs", []),
         "attractions": scraped_data["attractions"], # Return full attractions for map
         "itinerary": itinerary,
         "costs": costs,

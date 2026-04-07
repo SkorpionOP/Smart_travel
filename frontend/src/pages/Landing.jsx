@@ -10,7 +10,7 @@ const features = [
   { icon: <ShieldCheck size={22} />, title: 'Trip History', desc: 'Rate past trips and watch the ML engine get smarter every time.' },
 ];
 
-const destinations = ['Goa', 'Manali', 'Jaipur', 'Kerala', 'Mumbai', 'Rishikesh'];
+
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -27,23 +27,9 @@ export default function Landing() {
           <div className="absolute bottom-0 right-0 w-[50vw] h-[50vw] bg-secondary/10 rounded-full blur-[120px]" />
         </div>
 
-        {/* Floating destination pills */}
-        <div className="absolute top-32 left-4 md:left-24 flex flex-col gap-3 opacity-60">
-          {destinations.slice(0, 3).map((d, i) => (
-            <motion.div key={d} initial={{ x: -40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6 + i * 0.15 }}
-              className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-md text-sm font-bold text-primary dark:text-white border border-gray-100 dark:border-white/10 flex items-center gap-2">
-              <MapIcon size={14} className="text-secondary" /> {d}
-            </motion.div>
-          ))}
-        </div>
-        <div className="absolute top-32 right-4 md:right-24 flex flex-col gap-3 opacity-60">
-          {destinations.slice(3).map((d, i) => (
-            <motion.div key={d} initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6 + i * 0.15 }}
-              className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-md text-sm font-bold text-primary dark:text-white border border-gray-100 dark:border-white/10 flex items-center gap-2">
-              <MapIcon size={14} className="text-accent" /> {d}
-            </motion.div>
-          ))}
-        </div>
+
+
+
 
         {/* Logo badge */}
         <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 14 }}

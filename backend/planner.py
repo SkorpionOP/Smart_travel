@@ -2,7 +2,7 @@ import math
 
 def generate_itinerary(attractions, duration=None):
     if not duration or duration <= 0:
-        duration = math.ceil(len(attractions) / 3)
+        duration = math.ceil(len(attractions) / 5)
         if duration == 0: duration = 1
         
     itinerary = []

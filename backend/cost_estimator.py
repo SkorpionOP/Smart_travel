@@ -13,8 +13,13 @@ def calculate_costs(hotels, duration, travelers, travel_style, origin, destinati
     if travel_style == "Budget Friendly":
         avg_hotel_price = min(avg_hotel_price, 1200)
         
-    capacity_map = {"Budget Friendly": 4, "Luxury": 2, "Relax": 2}
-    room_capacity = capacity_map.get(travel_style, 3)
+    if hotels and "max_capacity" in hotels[0]:
+        avg_capacity = max(1, sum(h.get("max_capacity", 2) for h in hotels) / len(hotels))
+        room_capacity = int(round(avg_capacity))
+    else:
+        capacity_map = {"Budget Friendly": 4, "Luxury": 2, "Relax": 2}
+        room_capacity = capacity_map.get(travel_style, 3)
+        
     rooms_needed = max(1, (travelers + room_capacity - 1) // room_capacity)
     
     hotel_cost = int(avg_hotel_price * duration * rooms_needed)
@@ -50,10 +55,10 @@ def calculate_costs(hotels, duration, travelers, travel_style, origin, destinati
         
         if bus_total < train_total:
             flight_tickets_total = int(bus_total * 0.75) 
-            transport_mode = "Bus & Travel (Round Trip)"
+            transport_mode = "Economy Bus (Round Trip)"
         else:
             flight_tickets_total = int(train_total * 0.75)
-            transport_mode = "Train & Travel (Round Trip)"
+            transport_mode = "Sleeper Class Train (Round Trip)"
     else:
         # Distance too far OR failed geocoding. Use Skyscanner for Flight estimate.
         # If geocoding failed, we assume a far trip to be safe.
@@ -68,7 +73,14 @@ def calculate_costs(hotels, duration, travelers, travel_style, origin, destinati
                 per_person_flight_round_trip = min(per_person_flight_round_trip, ai_flight)
                 
         flight_tickets_total = int(per_person_flight_round_trip * travelers)
-        transport_mode = "Flights & Travel (Round Trip)"
+        if travel_style == "Luxury":
+            transport_mode = "First Class Flight (Round Trip)"
+        elif travel_style == "Quick":
+            transport_mode = "Express Flight (Round Trip)"
+        elif travel_style == "Budget Friendly":
+            transport_mode = "Economy Flight (Round Trip)"
+        else:
+            transport_mode = f"{travel_style} Flight (Round Trip)"
                 
     intl_mult = 1.35 if is_international else 1.0
     
